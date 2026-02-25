@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code — Ana Sofia Grass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;
+  --bg-card:rgba(20,18,18,0.88);
+  --bg-elevated:#141212;
+  --border:rgba(255,140,50,0.08);
+  --border-bright:rgba(255,140,50,0.2);
+  --orange:#e8734a;
+  --orange-bright:#ff8c55;
+  --orange-hot:#ff6633;
+  --orange-dim:rgba(232,115,74,0.4);
+  --amber:#ffb347;
+  --cream:#ffecd2;
+  --white:#f5f0eb;
+  --gray:#8a8078;
+  --gray-dim:#4a4440;
+  --green:#4ade80;
+  --red:#f87171;
+  --cyan:#67e8f9;
+  --font-mono:'JetBrains Mono','Space Mono',monospace;
+  --font-display:'Instrument Sans',sans-serif;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--white);font-family:var(--font-mono)}
+
+/* ── Scanlines ── */
+body::after{
+  content:'';position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+}
+
+/* ── Noise overlay ── */
+body::before{
+  content:'';position:fixed;top:0;left:0;width:100%;height:100%;z-index:9998;pointer-events:none;
+  opacity:0.015;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Grid BG ── */
+#grid-bg{
+  position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,140,50,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,140,50,0.03) 1px,transparent 1px);
+  background-size:60px 60px;
+}
+
+/* ── Floating Orb ── */
+#orb{
+  position:fixed;width:500px;height:500px;border-radius:50%;
+  background:radial-gradient(circle,rgba(232,115,74,0.12) 0%,rgba(232,115,74,0.02) 50%,transparent 70%);
+  z-index:0;pointer-events:none;
+  transition:top 1.5s cubic-bezier(.22,1,.36,1),left 1.5s cubic-bezier(.22,1,.36,1);
+}
+
+/* ── Progress Bar ── */
+#progress{position:fixed;top:0;left:0;width:100%;height:2px;z-index:1000;background:rgba(255,140,50,0.06)}
+#progress-bar{height:100%;width:0;background:var(--orange);transition:width .6s cubic-bezier(.22,1,.36,1);box-shadow:0 0 20px rgba(232,115,74,0.5)}
+
+/* ── Top Bar (terminal style) ── */
+#topbar{
+  position:fixed;top:0;left:0;width:100%;z-index:999;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 28px;
+  background:linear-gradient(180deg,rgba(10,10,10,0.95),rgba(10,10,10,0.7));
+  border-bottom:1px solid var(--border);
+  font-size:12px;
+}
+#topbar .left{display:flex;align-items:center;gap:12px}
+#topbar .dots{display:flex;gap:6px}
+#topbar .dot{width:10px;height:10px;border-radius:50%}
+#topbar .dot.r{background:#ff5f57}
+#topbar .dot.y{background:#febc2e}
+#topbar .dot.g{background:#28c840}
+#topbar .title{color:var(--gray);font-size:11px;letter-spacing:1px}
+#topbar .right{display:flex;align-items:center;gap:20px;color:var(--gray-dim)}
+#topbar .model{color:var(--orange);font-weight:600}
+.counter{color:var(--gray)}
+.counter .cur{color:var(--orange-bright)}
+
+/* ── Week pill ── */
+#week-pill{
+  position:fixed;top:48px;right:28px;z-index:999;
+  font-size:10px;letter-spacing:2px;font-weight:700;text-transform:uppercase;
+  padding:4px 14px;border-radius:3px;
+  background:rgba(232,115,74,0.08);border:1px solid rgba(232,115,74,0.15);
+  color:var(--orange);opacity:0;transition:opacity .4s ease;
+}
+#week-pill.show{opacity:1}
+
+/* ── Deck ── */
+#deck{position:relative;width:100%;height:100%;z-index:1}
+.slide{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  padding:70px 60px 50px;
+  opacity:0;transform:scale(0.96);
+  transition:opacity .55s cubic-bezier(.22,1,.36,1),transform .55s cubic-bezier(.22,1,.36,1);
+  pointer-events:none;flex-direction:column;
+}
+.slide.active{opacity:1;transform:scale(1);pointer-events:auto}
+
+/* ── Terminal Card ── */
+.terminal{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:10px;
+  max-width:940px;width:100%;
+  position:relative;overflow:hidden;
+  backdrop-filter:blur(20px);
+}
+.terminal-header{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 18px;
+  background:rgba(255,255,255,0.02);
+  border-bottom:1px solid var(--border);
+  font-size:11px;color:var(--gray-dim);
+}
+.terminal-header .tab{
+  padding:3px 12px;border-radius:4px;
+  background:rgba(255,140,50,0.06);color:var(--orange);
+  border:1px solid rgba(255,140,50,0.1);font-size:10px;font-weight:600;letter-spacing:1px;
+}
+.terminal-body{padding:36px 42px}
+.terminal-sm .terminal-body{padding:28px 36px}
+
+/* ── Typography ── */
+h2.title{
+  font-family:var(--font-display);font-weight:700;
+  font-size:clamp(28px,4vw,46px);line-height:1.15;
+  letter-spacing:-1px;color:var(--white);margin-bottom:14px;
+}
+.orange{color:var(--orange)}
+.bright{color:var(--orange-bright)}
+.amber{color:var(--amber)}
+.cream{color:var(--cream)}
+.green{color:var(--green)}
+.cyan{color:var(--cyan)}
+.dim{color:var(--gray)}
+.red{color:var(--red)}
+
+.subtitle{
+  font-family:var(--font-display);font-weight:400;
+  font-size:clamp(15px,1.8vw,19px);color:var(--gray);
+  line-height:1.65;margin-bottom:22px;max-width:680px;
+}
+.subtitle strong{color:var(--white);font-weight:600}
+
+.tag{
+  display:inline-block;font-size:10px;font-weight:700;
+  letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--orange);margin-bottom:14px;
+  padding:3px 0;border-bottom:1px solid rgba(232,115,74,0.2);
+}
+
+/* ── Command highlight ── */
+.cmd{
+  font-family:var(--font-mono);font-weight:600;
+  color:var(--orange-bright);
+  background:rgba(255,140,50,0.08);
+  padding:1px 8px;border-radius:4px;
+  border:1px solid rgba(255,140,50,0.12);
+}
+
+/* ── Code Block ── */
+.code{
+  background:#0d0b0b;
+  border:1px solid rgba(255,255,255,0.04);
+  border-radius:8px;padding:18px 22px;
+  font-size:13.5px;line-height:1.75;
+  color:var(--cream);overflow-x:auto;margin:14px 0;
+  position:relative;
+}
+.code .prompt{color:var(--orange)}
+.code .cmt{color:var(--gray-dim);font-style:italic}
+.code .str{color:var(--green)}
+.code .flag{color:var(--amber)}
+.code .kw{color:var(--cyan)}
+
+/* ── Feature List ── */
+.features{list-style:none;display:flex;flex-direction:column;gap:12px;margin-top:18px}
+.features li{
+  display:flex;align-items:flex-start;gap:14px;
+  font-size:14.5px;line-height:1.55;color:var(--gray);
+  font-family:var(--font-display);
+}
+.features li .ico{
+  flex-shrink:0;width:32px;height:32px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:12px;font-weight:700;
+  background:rgba(232,115,74,0.06);color:var(--orange);
+  border:1px solid rgba(232,115,74,0.12);
+}
+.features li .ico.g{background:rgba(74,222,128,0.06);color:var(--green);border-color:rgba(74,222,128,0.12)}
+.features li .ico.c{background:rgba(103,232,249,0.06);color:var(--cyan);border-color:rgba(103,232,249,0.12)}
+.features li .ico.a{background:rgba(255,179,71,0.06);color:var(--amber);border-color:rgba(255,179,71,0.12)}
+.features li strong{color:var(--white)}
+
+/* ── Two Columns ── */
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:18px}
+.col-card{
+  padding:22px;border-radius:8px;
+  background:rgba(0,0,0,0.35);border:1px solid var(--border);
+}
+.col-card h3{font-family:var(--font-display);font-size:18px;margin-bottom:8px;font-weight:600}
+
+/* ── VS Layout ── */
+.vs{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:center;margin-top:20px}
+.vs-mid{font-family:var(--font-display);font-weight:700;font-size:22px;color:var(--gray-dim)}
+
+/* ── Context bars ── */
+.bar-group{display:flex;flex-direction:column;gap:16px;margin-top:20px}
+.bar-item label{font-size:12px;display:flex;justify-content:space-between;margin-bottom:5px}
+.bar-track{height:24px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:4px;transition:width 1.2s cubic-bezier(.22,1,.36,1)}
+.bar-fill.ok{background:linear-gradient(90deg,var(--orange),var(--amber));width:30%}
+.bar-fill.warn{background:linear-gradient(90deg,var(--orange-hot),var(--red));width:82%}
+.bar-fill.full{background:var(--red);width:100%;animation:pulse-bar 1.5s ease-in-out infinite}
+@keyframes pulse-bar{0%,100%{opacity:1}50%{opacity:.7}}
+
+/* ── Agent Diagram ── */
+.agent-tree{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:22px}
+.agent-box{
+  padding:10px 24px;border-radius:6px;
+  font-size:12px;font-weight:700;letter-spacing:1px;text-align:center;
+}
+.agent-main{
+  background:rgba(232,115,74,0.1);border:1px solid rgba(232,115,74,0.25);color:var(--orange-bright);
+  font-size:14px;padding:14px 32px;
+}
+.agent-line{width:1px;height:16px;background:rgba(232,115,74,0.2)}
+.agent-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.agent-sub{
+  background:rgba(255,255,255,0.03);border:1px solid var(--border);
+  color:var(--gray);padding:8px 16px;font-size:11px;
+}
+.agent-sub .lbl{color:var(--orange);display:block;margin-bottom:2px}
+.agent-lines{display:flex;gap:60px}
+
+/* ── Title Slide ── */
+.hero{text-align:center}
+.hero-pre{
+  font-size:13px;color:var(--gray-dim);margin-bottom:20px;letter-spacing:3px;
+}
+.hero h1{
+  font-family:var(--font-display);font-weight:700;
+  font-size:clamp(50px,8vw,100px);line-height:0.95;
+  letter-spacing:-3px;color:var(--white);
+}
+.hero h1 .o{
+  color:var(--orange);
+  text-shadow:0 0 40px rgba(232,115,74,0.3),0 0 80px rgba(232,115,74,0.15);
+}
+.hero-line{
+  width:60px;height:2px;margin:28px auto;
+  background:var(--orange);box-shadow:0 0 15px rgba(232,115,74,0.4);
+  border-radius:1px;
+}
+.hero-by{font-family:var(--font-display);font-size:18px;color:var(--gray);font-weight:400}
+.hero-hint{
+  margin-top:48px;font-size:12px;color:var(--gray-dim);
+}
+.hero-hint span{color:var(--orange)}
+
+/* ── Blinking cursor ── */
+.cursor{display:inline-block;width:8px;height:18px;background:var(--orange);margin-left:4px;vertical-align:text-bottom;animation:blink 1s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ── Section divider ── */
+.divider{text-align:center}
+.divider-num{
+  font-family:var(--font-mono);font-weight:700;
+  font-size:clamp(80px,14vw,160px);line-height:1;
+  color:transparent;
+  -webkit-text-stroke:1px rgba(232,115,74,0.15);
+  margin-bottom:4px;
+}
+.divider h2{
+  font-family:var(--font-display);font-weight:700;
+  font-size:clamp(30px,5vw,50px);letter-spacing:-1px;
+}
+.divider .sub{font-family:var(--font-display);font-size:17px;color:var(--gray);margin-top:10px;font-weight:400}
+
+/* ── Stagger ── */
+.slide.active .stg>*{
+  opacity:0;transform:translateY(14px);
+  animation:up .5s cubic-bezier(.22,1,.36,1) forwards;
+}
+.slide.active .stg>*:nth-child(1){animation-delay:.03s}
+.slide.active .stg>*:nth-child(2){animation-delay:.09s}
+.slide.active .stg>*:nth-child(3){animation-delay:.15s}
+.slide.active .stg>*:nth-child(4){animation-delay:.21s}
+.slide.active .stg>*:nth-child(5){animation-delay:.27s}
+.slide.active .stg>*:nth-child(6){animation-delay:.33s}
+.slide.active .stg>*:nth-child(7){animation-delay:.39s}
+.slide.active .stg>*:nth-child(8){animation-delay:.45s}
+.slide.active .stg>*:nth-child(9){animation-delay:.51s}
+@keyframes up{to{opacity:1;transform:translateY(0)}}
+
+/* ── Link grid ── */
+.link-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+.link-item{
+  padding:14px;border-radius:6px;font-size:12px;text-align:center;
+  background:rgba(255,255,255,0.02);border:1px solid var(--border);
+  color:var(--gray);transition:border-color .2s;
+}
+.link-item strong{color:var(--orange);display:block;margin-bottom:2px;font-size:13px}
+
+/* ── Nav bottom ── */
+#nav{
+  position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:999;
+  display:flex;align-items:center;gap:14px;
+  font-size:11px;color:var(--gray-dim);
+}
+.nav-k{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:24px;height:20px;border-radius:3px;font-size:10px;
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);
+}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .slide{padding:55px 18px 40px}
+  .terminal-body{padding:22px 20px}
+  .cols,.vs{grid-template-columns:1fr}
+  .link-grid{grid-template-columns:1fr 1fr}
+  #topbar{padding:10px 16px}
+  .agent-lines{gap:24px}
+}
+@media(max-width:480px){
+  .link-grid{grid-template-columns:1fr}
+  .hero h1{font-size:48px;letter-spacing:-2px}
+}
+</style>
+</head>
+<body>
+
+<div id="grid-bg"></div>
+<div id="orb" style="top:20%;left:30%"></div>
+
+<div id="progress"><div id="progress-bar"></div></div>
+
+<div id="topbar">
+  <div class="left">
+    <div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+    <span class="title">claude-code</span>
+  </div>
+  <div class="right">
+    <span class="model">opus</span>
+    <span class="counter"><span class="cur">1</span><span class="dim"> / </span><span class="total">29</span></span>
+  </div>
+</div>
+
+<div id="week-pill"></div>
+<div id="nav"><span class="nav-k">&larr;</span><span class="nav-k">&rarr;</span> navigate &nbsp;|&nbsp; click left/right</div>
+
+<div id="deck">
+
+<!-- ═══ 0: TITLE ═══ -->
+<div class="slide active" data-w="0">
+  <div class="hero stg">
+    <div class="hero-pre">~ / C L A U D E&nbsp;&nbsp;C O D E</div>
+    <h1>Claude<br><span class="o">Code</span></h1>
+    <div class="hero-line"></div>
+    <div class="hero-by">Ana Sofia Grass</div>
+    <div class="hero-hint"><span>&rarr;</span> to begin<span class="cursor"></span></div>
+  </div>
+</div>
+
+<!-- ═══ 1: WEEK 1 DIVIDER ═══ -->
+<div class="slide" data-w="1">
+  <div class="divider stg">
+    <div class="divider-num">01</div>
+    <h2><span class="orange">Week</span> One</h2>
+    <div class="sub">Fundamentals & Essential Commands</div>
+  </div>
+</div>
+
+<!-- ═══ 2: SOCRATIC ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">PHILOSOPHY</span><span>socratic-questions.md</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Work Method</span>
+      <h2 class="title"><span class="orange">Socratic</span> Questions</h2>
+      <p class="subtitle">Claude doesn't guess — it <strong>asks first</strong>. Before writing a single line, it understands exactly what you need.</p>
+      <div class="code">
+        <span class="cmt"># Instead of assuming, Claude asks questions:</span><br><br>
+        <span class="prompt">❯</span> <em>"Before you build anything, ask me 5 questions to really make sure you understand what I need"</em><br>
+      </div>
+      <ul class="features">
+        <li><span class="ico">✕</span><span><strong>Eliminates assumptions</strong></span></li>
+        <li><span class="ico">🧠</span><span><strong>Forces you to think</strong></span></li>
+        <li><span class="ico">↓</span><span><strong>Lowers risk</strong> of things going wrong</span></li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 2b: PLAN MODE ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">PHILOSOPHY</span><span>plan-mode.md</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Work Method</span>
+      <h2 class="title"><span class="orange">Plan Mode</span></h2>
+      <p class="subtitle" style="font-style:italic;font-size:15px">(Your New Best Friend)</p>
+      <div class="code">
+        <span class="prompt">❯</span> <em>"Now show me your plan before you start.<br>&nbsp;&nbsp;DO NOT BUILD until I approve"</em><span class="cursor"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 2c: LOG.DEV ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">TOOL</span><span>log.dev</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Resources</span>
+      <h2 class="title"><span class="orange">log.dev</span></h2>
+      <p class="subtitle">Need a logo for your project? <strong>log.dev</strong> lets you get any logo you need so it works perfectly in your app.</p>
+      <div class="code">
+        <span class="cmt"># Get any logo, ready to use</span><br><br>
+        <span class="prompt">❯</span> logo = <span class="str">"https://log.dev/..."</span><br>
+        <span class="cmt"># → Any brand, any format, always available</span><span class="cursor"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 2d: PLUGINS ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">EXTEND</span><span>plugins.md</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Ecosystem</span>
+      <h2 class="title"><span class="orange">Plugins</span> in Claude Code</h2>
+      <p class="subtitle">Plugins are <strong>extensions</strong> that add new skills and slash commands to Claude Code. They come from Git repos and can bundle skills, hooks, MCP servers, and more.</p>
+      <div class="code">
+        <span class="cmt"># Install a plugin</span><br>
+        <span class="prompt">❯</span> <span class="flag">/plugins</span> add user/repo<br><br>
+        <span class="cmt"># Use its skills with /name</span><br>
+        <span class="prompt">❯</span> <span class="flag">/frontend-design</span> Build me a landing page<span class="cursor"></span>
+      </div>
+      <ul class="features">
+        <li><span class="ico">🎨</span><span><strong>/frontend-design</strong> — Generates production-grade UI with high design quality</span></li>
+        <li><span class="ico">⚡</span><span><strong>Extensible</strong> — Anyone can create and share plugins</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 2e: GITHUB VERSIONS ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">ESSENTIAL</span><span>github-versions.md</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Safety Net</span>
+      <h2 class="title"><span class="orange">GitHub</span> = Your Backup</h2>
+      <p class="subtitle">Always keep your work on GitHub. If something breaks, you have <strong>versions</strong> of everything. Just ask Claude Code to connect to your GitHub and it handles the rest.</p>
+      <div class="code">
+        <span class="cmt"># 2 Operations — think of it like a videogame</span><br><br>
+        <span class="str">1.</span> <strong>Commit</strong>: Save your game<br>
+        <span class="str">2.</span> <strong>Restore</strong>: Reload last checkpoint<span class="cursor"></span>
+      </div>
+      <ul class="features">
+        <li><span class="ico">💾</span><span><strong>Commit</strong> — Saves a snapshot of your project at that moment</span></li>
+        <li><span class="ico">⏪</span><span><strong>Restore</strong> — Go back to any previous version if something goes wrong</span></li>
+        <li><span class="ico">🔗</span><span><strong>Setup</strong> — Just tell Claude Code to connect to your GitHub, it does the rest</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 2f: MOBILE WORKFLOW ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">PRO TIP</span><span>mobile-workflow.md</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Work Anywhere</span>
+      <h2 class="title"><span class="orange">Code</span> From Your Phone</h2>
+      <p class="subtitle">Connect your GitHub repo + download <strong>Claude on your phone</strong> = you can work from anywhere, no computer terminal needed.</p>
+      <div class="code">
+        <span class="cmt"># Your setup</span><br><br>
+        <span class="str">1.</span> GitHub repo connected to Claude Code<br>
+        <span class="str">2.</span> Claude app on your phone<br>
+        <span class="str">3.</span> That's it — code from anywhere<span class="cursor"></span>
+      </div>
+      <ul class="features">
+        <li><span class="ico">📱</span><span><strong>No terminal needed</strong> — Work straight from your phone</span></li>
+        <li><span class="ico">☁️</span><span><strong>GitHub syncs everything</strong> — Your code is always up to date</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 2g: PULL REQUESTS ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">GITHUB</span><span>pull-requests.md</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Collaboration</span>
+      <h2 class="title"><span class="orange">Merge</span> Pull Requests</h2>
+      <p class="subtitle">A <strong>Pull Request (PR)</strong> is a proposal to merge changes into your project. Think of it as saying: <em>"Hey, I made these changes — review them before they go live."</em></p>
+      <div class="code">
+        <span class="cmt"># What's the flow?</span><br><br>
+        <span class="str">1.</span> You work on a separate <strong>branch</strong> (a copy)<br>
+        <span class="str">2.</span> You open a <strong>PR</strong> to propose your changes<br>
+        <span class="str">3.</span> Review &amp; approve<br>
+        <span class="str">4.</span> <strong>Merge</strong> — your changes go into the main project<span class="cursor"></span>
+      </div>
+      <ul class="features">
+        <li><span class="ico">🔀</span><span><strong>Safe merging</strong> — Changes are reviewed before going into main</span></li>
+        <li><span class="ico">👀</span><span><strong>Review first</strong> — Catch mistakes before they become problems</span></li>
+        <li><span class="ico">🤖</span><span><strong>Claude handles it</strong> — Just ask it to create a PR and merge</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 8: Merge PRs ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">GIT</span><span>pull-requests</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Collaboration</span>
+      <h2 class="title">Merge <span class="orange">Pull Requests</span></h2>
+      <p class="subtitle">Create, describe, and merge PRs directly from the terminal.</p>
+      <div class="code">
+        <span class="cmt"># Typical workflow with Claude:</span><br><br>
+        <span class="prompt">❯</span> Claude, create a PR with these changes<br><br>
+        <span class="str">Claude →</span> PR <span class="flag">#42</span> created<br>
+        &nbsp;&nbsp;<span class="dim">├─</span> Changes description<br>
+        &nbsp;&nbsp;<span class="dim">├─</span> Code review<br>
+        &nbsp;&nbsp;<span class="dim">└─</span> <span class="str">Merge complete ✓</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 3: /statusline ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">COMMAND</span><span>configuration</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Visibility</span>
+      <h2 class="title"><span class="cmd">/statusline</span></h2>
+      <p class="subtitle">Displays the <strong>context window</strong> and <strong>current directory</strong> always visible in the status bar.</p>
+      <div class="code">
+        <span class="prompt">❯</span> <span class="flag">/statusline</span> Can you make sure you display<br>
+        &nbsp;&nbsp;the current <span class="str">context window</span> and the<br>
+        &nbsp;&nbsp;current <span class="str">directory</span> always in the statusline?
+      </div>
+      <ul class="features">
+        <li><span class="ico">%</span><span><strong>Context Window</strong> — How much space you have left</span></li>
+        <li><span class="ico c">📂</span><span><strong>Directory</strong> — Always know where you are</span></li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 18: Context Window ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">⚠ CRITICAL</span><span>context-management</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Performance</span>
+      <h2 class="title">Context <span class="orange">Window</span></h2>
+      <p class="subtitle">Keep the statusline context value <strong style="color:var(--green)">above 30%</strong>. When it drops below that, quality starts to fall — time to <span class="cmd">/clear</span>.</p>
+      <div class="code">
+        <span class="cmt"># What the statusline shows:</span><br><br>
+        <span class="green">ctx: 85%</span> &nbsp;← Plenty of room, you're good<br>
+        <span class="amber">ctx: 42%</span> &nbsp;← Getting low, consider /clear<br>
+        <span class="red">ctx: 12%</span> &nbsp;← Too low — quality drops, hallucinations start<span class="cursor"></span>
+      </div>
+      <ul class="features">
+        <li><span class="ico">🍎</span><span><strong>Mac users</strong> — Download <strong>CodexBar</strong> to monitor your token usage with Claude Code in real time</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 25: Compression ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">CONTEXT</span><span>auto-compress</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Automatic</span>
+      <h2 class="title"><span class="orange">Compression</span></h2>
+      <p class="subtitle">When the context window runs out, Claude <strong>automatically compresses</strong> the information.</p>
+      <div class="code">
+        <span class="cmt"># Automatic process:</span><br><br>
+        <span class="flag">Context 100%</span> → Full detailed conversation<br>
+        <span class="flag">Context  50%</span> → Running well<br>
+        <span class="red">Context   5%</span> → <span class="str">⚡ Compression activated</span><br>
+        <span class="flag">Context  60%</span> → <span class="str">Info compressed, space recovered ✓</span>
+      </div>
+      <p class="dim" style="font-size:12px;margin-top:14px">Combined with <span class="cmd">/clear</span> + CLAUDE.md → best strategy for long sessions</p>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 4: CLAUDE.md + /clear ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">ESSENTIAL</span><span>context-management</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Persistent Memory</span>
+      <h2 class="title"><span class="orange">CLAUDE.md</span> + <span class="cmd">/clear</span></h2>
+      <p class="subtitle">Your instruction file that <strong>persists across sessions</strong>. Save everything there and clear the context.</p>
+      <div class="cols">
+        <div class="col-card">
+          <h3 class="orange">Why?</h3>
+          <p style="color:var(--gray);font-size:14px;line-height:1.65;font-family:var(--font-display)">When the context fills up, <strong style="color:var(--red)">quality drops</strong> and Claude starts creating random things and hallucinating.</p>
+        </div>
+        <div class="col-card">
+          <h3 class="amber">Workflow</h3>
+          <div class="code" style="margin:0;font-size:12px;background:transparent;border:0;padding:0">
+            <span class="cmt">1.</span> Save instructions in <span class="str">CLAUDE.md</span><br>
+            <span class="cmt">2.</span> Run <span class="flag">/clear</span><br>
+            <span class="cmt">3.</span> Claude re-reads CLAUDE.md automatically<br>
+            <span class="cmt">4.</span> <span class="str">Clean context ✓</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 4b: CLAUDE.md PROMPT ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">ESSENTIAL</span><span>claude-md-prompt</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">The Prompt</span>
+      <h2 class="title">Creating Your <span class="orange">CLAUDE.md</span></h2>
+      <div class="code">
+        <span class="prompt">❯</span> <em>"Hey, formalize all these instructions in a<br>
+        &nbsp;&nbsp;CLAUDE.md file so that I can run this in the<br>
+        &nbsp;&nbsp;future for more companies"</em><span class="cursor"></span>
+      </div>
+      <p class="subtitle" style="margin-top:16px">Claude takes everything you've been doing in the session and saves it as <strong>reusable instructions</strong>. Next time, it already knows what to do.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 5: /doctor ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">DIAGNOSTICS</span><span>error-handling</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Debug</span>
+      <h2 class="title"><span class="cmd">/doctor</span></h2>
+      <p class="subtitle">When something fails, Doctor diagnoses the problem automatically.</p>
+      <div class="code">
+        <span class="prompt">$</span> claude <span class="flag">/doctor</span><br><br>
+        <span class="str">✓</span> Checking authentication...<br>
+        <span class="str">✓</span> Checking model access...<br>
+        <span class="str">✓</span> Checking MCP servers...<br>
+        <span class="red">✗</span> <span class="red">Issue found: API key expired</span><br><br>
+        <span class="cmt"># Claude tells you exactly what to fix</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 6: /model ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">MODEL</span><span>selection</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Quality</span>
+      <h2 class="title"><span class="cmd">/model</span> → <span class="orange">Opus</span></h2>
+      <p class="subtitle">Switch between models. <strong>Opus is the best</strong> for maximum quality.</p>
+      <ul class="features">
+        <li><span class="ico">★</span><span><strong class="orange">Opus</strong> — Maximum quality, deep reasoning, complex tasks</span></li>
+        <li><span class="ico a">⚡</span><span><strong class="amber">Sonnet</strong> — Balance between speed and quality</span></li>
+        <li><span class="ico g">→</span><span><strong class="green">Haiku</strong> — Fast and affordable for simple tasks</span></li>
+      </ul>
+      <div class="code" style="margin-top:16px">
+        <span class="prompt">❯</span> <span class="flag">/model</span> opus<br>
+        <span class="str">✓ Switched to claude-opus-4</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 7: Vercel + GitHub ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">DEPLOY</span><span>vercel + github</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Production</span>
+      <h2 class="title"><span class="orange">Vercel</span> + GitHub</h2>
+      <p class="subtitle">Deploy your website with <strong>a single message</strong>. Claude handles everything.</p>
+      <div class="code">
+        <span class="prompt">❯</span> Hey Claude please <span class="str">host this website on Vercel</span><br>
+        &nbsp;&nbsp;and please <span class="str">link vercel to this github directory</span>
+      </div>
+      <ul class="features" style="margin-top:14px">
+        <li><span class="ico">01</span><span>Sets up the project on Vercel</span></li>
+        <li><span class="ico">02</span><span>Connects the GitHub repository</span></li>
+        <li><span class="ico">03</span><span>Auto-deploy on every <span class="cmd">git push</span></span></li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 9: /rewind ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">TIME TRAVEL</span><span>history</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Undo</span>
+      <h2 class="title"><span class="cmd">/rewind</span></h2>
+      <p class="subtitle">Travel back in time in your session. Choose what to undo:</p>
+      <div class="cols">
+        <div class="col-card">
+          <h3 class="orange">Option A</h3>
+          <p style="color:var(--gray);font-size:14px;line-height:1.6;font-family:var(--font-display)">Undo the <strong style="color:var(--white)">conversation</strong> but <span class="green">keep the changes</span> in the code</p>
+        </div>
+        <div class="col-card">
+          <h3 class="amber">Option B</h3>
+          <p style="color:var(--gray);font-size:14px;line-height:1.6;font-family:var(--font-display)">Undo <strong style="color:var(--white)">conversation + code</strong> — go back completely to the previous point</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 10: Aliases + Permissions ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">⚠ ADVANCED</span><span>permissions</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Configuration</span>
+      <h2 class="title">Aliases & <span class="orange">Permissions</span></h2>
+      <p class="subtitle">Custom alias with elevated permissions. <strong style="color:var(--red)">Use with caution.</strong></p>
+      <div class="code">
+        <span class="cmt"># Alias "claudia" with elevated permissions</span><br>
+        <span class="prompt">$</span> alias <span class="str">claudia</span>=<span class="str">"claude --dangerously-skip-permissions"</span>
+      </div>
+      <ul class="features" style="margin-top:14px">
+        <li><span class="ico">⚡</span><span>No confirmation required for each operation</span></li>
+        <li><span class="ico" style="color:var(--red);border-color:rgba(248,113,113,0.15);background:rgba(248,113,113,0.06)">!</span><span><strong class="red">Caution</strong> — Only when you 100% trust the task</span></li>
+        <li><span class="ico a">🔐</span><span>Permissions <strong>do matter</strong>, especially with API keys</span></li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 11: Shortcuts ═══ -->
+<div class="slide" data-w="1">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">SHORTCUTS</span><span>quick-shortcuts</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Productivity</span>
+      <h2 class="title">Useful <span class="orange">Shortcuts</span></h2>
+      <div class="cols" style="margin-top:18px">
+        <div class="col-card">
+          <h3 class="cyan" style="font-family:var(--font-mono);font-size:20px">Ctrl + A</h3>
+          <p style="color:var(--gray);font-size:14px;line-height:1.6;font-family:var(--font-display);margin-top:8px">Copies <strong style="color:var(--white)">all the content</strong> of the current page in the terminal</p>
+        </div>
+        <div class="col-card">
+          <h3 class="amber" style="font-family:var(--font-mono);font-size:20px">/resume</h3>
+          <p style="color:var(--gray);font-size:14px;line-height:1.6;font-family:var(--font-display);margin-top:8px">Return to a <strong style="color:var(--white)">past chat</strong> and continue where you left off</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 12: WEEK 2 DIVIDER ═══ -->
+<div class="slide" data-w="2">
+  <div class="divider stg">
+    <div class="divider-num" style="color:transparent;-webkit-text-stroke-color:rgba(232,115,74,0.2)">02</div>
+    <h2>Week <span class="orange">Two</span></h2>
+    <div class="sub">MCP Servers, Agents & Automation</div>
+  </div>
+</div>
+
+<!-- ═══ 13: EXA MCP ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">MCP</span><span>exa-server</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Data Provider</span>
+      <h2 class="title"><span class="orange">Exa</span> MCP Server</h2>
+      <p class="subtitle">Gives Claude the ability to do <strong>deep research</strong> across the entire web in real time.</p>
+      <ul class="features">
+        <li><span class="ico">🔍</span><span><strong>Companies</strong> — Deep information about any company</span></li>
+        <li><span class="ico">👤</span><span><strong>People</strong> — LinkedIn, publications, podcasts</span></li>
+        <li><span class="ico">📰</span><span><strong>News</strong> — Funding rounds, launches, partnerships</span></li>
+      </ul>
+      <div class="code" style="margin-top:14px;font-size:12.5px">
+        <span class="prompt">❯</span> Hey Claude, use the Exa-MCP to go and research<br>
+        &nbsp;&nbsp;all of the latest news for <span class="str">Open AI</span><span class="cursor"></span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 13b: EXA IN ACTION ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">MCP</span><span>exa-prompts</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">How To Use It</span>
+      <h2 class="title"><span class="orange">Exa</span> — The Prompts</h2>
+      <div class="code">
+        <span class="cmt"># 1. Install it</span><br><br>
+        <span class="prompt">❯</span> Hey Claude help me install the <span class="str">exa mcp server</span><br>
+        &nbsp;&nbsp;from this page, make sure to <span class="flag">enable all tools</span><br>
+        &nbsp;&nbsp;by default. Make sure it's accessible at <span class="flag">all levels</span><br>
+        &nbsp;&nbsp;inside this computer<br>
+        &nbsp;&nbsp;<span class="dim">https://exa.ai/docs/reference/exa-mcp</span>
+      </div>
+      <div class="code" style="margin-top:12px">
+        <span class="cmt"># 2. Use it</span><br><br>
+        <span class="prompt">❯</span> Hey Claude, use the Exa-MCP to go and research<br>
+        &nbsp;&nbsp;all of the latest news that you can find for <span class="str">Open AI</span><span class="cursor"></span>
+      </div>
+      <p class="dim" style="font-size:12px;margin-top:14px;text-align:center"><span class="green">https://exa.ai/</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 14: Installing MCPs ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">SETUP</span><span>mcp-install</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Configuration</span>
+      <h2 class="title">Installing <span class="orange">MCP Servers</span></h2>
+      <p class="subtitle">Ask Claude to install the server from the official documentation.</p>
+      <div class="code">
+        <span class="prompt">❯</span> Hey Claude help me install the <span class="str">exa mcp server</span><br>
+        &nbsp;&nbsp;from this page, make sure to <span class="flag">enable all tools</span><br>
+        &nbsp;&nbsp;by default. Make sure it's accessible at <span class="flag">all levels</span><br><br>
+        &nbsp;&nbsp;<span class="dim">https://exa.ai/docs/reference/exa-mcp</span>
+      </div>
+      <p class="dim" style="font-size:12px;margin-top:14px">Claude reads the docs, configures the server, and enables all tools automatically.</p>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 15: Exa vs Firecrawl ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">COMPARISON</span><span>tools</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">MCP Tools</span>
+      <h2 class="title">Exa <span class="dim">vs</span> <span class="cyan">Firecrawl</span></h2>
+      <div class="vs">
+        <div class="col-card">
+          <h3 class="orange">Exa</h3>
+          <p style="color:var(--gray);font-size:13.5px;line-height:1.7;font-family:var(--font-display);margin-top:8px">
+            Deep research on <strong style="color:var(--white)">companies and people</strong><br>
+            Smart semantic search<br>
+            News, funding, publications
+          </p>
+        </div>
+        <div class="vs-mid">vs</div>
+        <div class="col-card">
+          <h3 class="cyan">Firecrawl</h3>
+          <p style="color:var(--gray);font-size:13.5px;line-height:1.7;font-family:var(--font-display);margin-top:8px">
+            Scraping of <strong style="color:var(--white)">specific web pages</strong><br>
+            Extracts content from fixed URLs<br>
+            Ideal for structured data
+          </p>
+        </div>
+      </div>
+      <p class="dim" style="font-size:11px;margin-top:18px;text-align:center">Just telling it to do research → it uses Exa MCP automatically</p>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 16: Research Agent ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">AGENT</span><span>sales-research</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Workflow</span>
+      <h2 class="title">Research Agent <span class="orange">for Sales</span></h2>
+      <p class="subtitle">Research agent for sales prospecting. Give it a company name → it generates a complete brief.</p>
+      <ul class="features">
+        <li><span class="ico">01</span><span>Looks up the company and understands what they do</span></li>
+        <li><span class="ico">02</span><span>Recent news — funding, launches, hires</span></li>
+        <li><span class="ico">03</span><span>Identifies the <strong>VP of Sales</strong> / CRO / Head of Revenue</span></li>
+        <li><span class="ico">04</span><span>Public quotes, LinkedIn posts, podcasts</span></li>
+        <li><span class="ico">05</span><span><strong>Structured brief</strong> with outreach angle</span></li>
+      </ul>
+      <p style="font-size:12px;margin-top:14px"><span class="amber">⚡ No Python needed</span> <span class="dim">— everything in natural language</span></p>
+      <p class="dim" style="font-size:12px;margin-top:8px">💡 Once Exa is installed, just tell Claude to <strong style="color:var(--white)">"do research"</strong> — it automatically uses Exa without you having to mention it.</p>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 17: Sub-agents ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">ARCHITECTURE</span><span>sub-agents</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Scalability</span>
+      <h2 class="title"><span class="orange">Sub-agents</span> <span class="dim">(Minions)</span></h2>
+      <p class="subtitle">Specialized agents that do specific work without <strong>polluting the main context</strong>.</p>
+      <div class="agent-tree">
+        <div class="agent-box agent-main">🧠 MAIN AGENT</div>
+        <div class="agent-lines">
+          <div class="agent-line"></div>
+          <div class="agent-line"></div>
+          <div class="agent-line"></div>
+        </div>
+        <div class="agent-row">
+          <div class="agent-box agent-sub"><span class="lbl">🔍</span>Company A</div>
+          <div class="agent-box agent-sub"><span class="lbl">🔍</span>Company B</div>
+          <div class="agent-box agent-sub"><span class="lbl">🔍</span>Company C</div>
+        </div>
+      </div>
+      <p class="dim" style="font-size:12px;text-align:center;margin-top:14px">Each sub-agent → writes .md → reports summary → gets removed</p>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 17b: WHEN TO USE SUB-AGENTS ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">ARCHITECTURE</span><span>when-to-use-sub-agents</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Best Practices</span>
+      <h2 class="title">When to Create <span class="orange">Sub-agents</span>?</h2>
+      <p class="subtitle">To <strong>keep the context clean</strong>. They do the heavy work and only return a summary.</p>
+      <div class="code" style="font-size:12.5px">
+        <span class="str">Lots of output</span> → sub-agent<br>
+        <span class="str">Parallel tasks</span> → sub-agent<br>
+        <span class="str">Quick &amp; simple</span> → main agent is fine<span class="cursor"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 17c: SUB-AGENT EXAMPLE ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">ARCHITECTURE</span><span>sub-agent-example</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Example</span>
+      <h2 class="title">Sub-agent <span class="orange">in Action</span></h2>
+      <div class="code">
+        <span class="prompt">❯</span> <em>"I need you to research these 5 companies:<br>
+        &nbsp;&nbsp;Stripe, Notion, Linear, Vercel, Supabase.<br>
+        &nbsp;&nbsp;For each one, create a sub-agent that finds<br>
+        &nbsp;&nbsp;their latest news, key people, and what they do.<br>
+        &nbsp;&nbsp;Save each report as a separate .md file."</em><span class="cursor"></span>
+      </div>
+      <p class="dim" style="font-size:12px;margin-top:14px">5 sub-agents run in parallel → each writes a .md → main agent stays clean</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 19: Cron Jobs ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">AUTOMATION</span><span>scheduler</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Recurrence</span>
+      <h2 class="title"><span class="orange">Cron</span> Jobs</h2>
+      <p class="subtitle">Schedule tasks to run <strong>automatically</strong> at specific times.</p>
+      <div class="code">
+        <span class="cmt"># Daily research at 9 AM</span><br>
+        <span class="prompt">$</span> crontab -e<br><br>
+        <span class="flag">0 9 * * *</span> claude <span class="str">"Research the latest news<br>&nbsp;&nbsp;for my top 10 clients"</span>
+      </div>
+      <p class="dim" style="font-size:13px;margin-top:14px;font-family:var(--font-display)">Ideal for recurring reports, competitive monitoring, and automatic updates.</p>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 12b: TRIGGER.DEV ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">AUTOMATION</span><span>trigger.dev</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Infrastructure</span>
+      <h2 class="title"><span class="orange">Trigger.dev</span> + Claude Code</h2>
+      <p class="subtitle">Run Claude Code agents <strong>automatically</strong> — on a schedule, on events, or chained together.</p>
+      <ul class="features">
+        <li><span class="ico">⏰</span><span><strong>Scheduled agents</strong> — Every night at 2am → agent reviews code and generates a report</span></li>
+        <li><span class="ico">⏳</span><span><strong>Long tasks, no timeout</strong> — Runs jobs that last minutes or hours without cutting off</span></li>
+        <li><span class="ico">⚡</span><span><strong>React to events</strong> — A file is uploaded → agent processes it. A PR is opened → agent reviews it</span></li>
+        <li><span class="ico">🔗</span><span><strong>Orchestrate agents</strong> — Chain them: one finishes → Trigger.dev launches the next</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 20: Docker ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">INFRA</span><span>containers</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Isolation</span>
+      <h2 class="title"><span class="orange">Docker</span></h2>
+      <p class="subtitle">Isolate each client's information in <strong>separate containers</strong>.</p>
+      <ul class="features">
+        <li><span class="ico">🔒</span><span><strong>Isolation</strong> — One client's data never mixes with another's</span></li>
+        <li><span class="ico c">📦</span><span><strong>Reproducibility</strong> — Same environment across all projects</span></li>
+        <li><span class="ico g">🚀</span><span><strong>Deploy</strong> — From your machine to production with no surprises</span></li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 20b: Docker + Claude Code ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">INFRA</span><span>docker-use-cases</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Use Cases</span>
+      <h2 class="title"><span class="orange">Docker</span> + Claude Code</h2>
+      <ul class="features">
+        <li><span class="ico">👥</span><span><strong>Multiple clients</strong> — Each client gets its own container. The agent for Client A can never see or touch Client B's data</span></li>
+        <li><span class="ico">📦</span><span><strong>Safe installs</strong> — Claude installs dependencies, runs scripts, modifies files — all inside the container, never touching your real machine</span></li>
+        <li><span class="ico">🔁</span><span><strong>Reproducibility</strong> — Works the same on your laptop, your teammate's machine, and production. No more "it works on my machine"</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 21: /chrome ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">BROWSER</span><span>web-navigation</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Navigation</span>
+      <h2 class="title"><span class="cmd">/chrome</span></h2>
+      <p class="subtitle">Claude can <strong>browse the web</strong>, interact with pages, and extract information.</p>
+      <div class="code">
+        <span class="prompt">❯</span> Hey Claude, go to this website.<br>
+        &nbsp;&nbsp;It has a lot of pages, and I need you to<br>
+        &nbsp;&nbsp;<span class="str">navigate and find the page with my info</span>.<br>
+        &nbsp;&nbsp;My name is <span class="flag">Ana Sofia Grass</span><span class="cursor"></span>
+      </div>
+      <p class="dim" style="font-size:12px;margin-top:14px">Claude navigates multiple pages until it finds exactly what you're looking for.</p>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 22: Attio CRM — Connect ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">CRM</span><span>attio-setup</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Use Case</span>
+      <h2 class="title">Claude Code + <span class="orange">Attio</span> CRM</h2>
+      <p class="subtitle">Connect Claude to your CRM and let it work <strong>directly with your sales data</strong>.</p>
+      <div class="code">
+        <span class="cmt"># Step 1: Connect</span><br><br>
+        <span class="prompt">❯</span> <em>"Read Claude.md &amp; Connect to my Attio.<br>
+        &nbsp;&nbsp;Pull a sample contact to show me it's working"</em>
+      </div>
+      <div class="code" style="margin-top:10px">
+        <span class="cmt"># Step 2: Analyze</span><br><br>
+        <span class="prompt">❯</span> <em>"Tell me: which deals are at risk of being lost<br>
+        &nbsp;&nbsp;this quarter? Show me the deal name, amount, owner,<br>
+        &nbsp;&nbsp;days since last activity, and current stage.<br>
+        &nbsp;&nbsp;Sort by risk level."</em><span class="cursor"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 22b: Attio CRM — Actions ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">CRM</span><span>attio-actions</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Use Case</span>
+      <h2 class="title"><span class="orange">Attio</span> — Compare &amp; Re-engage</h2>
+      <div class="code">
+        <span class="cmt"># Compare reps</span><br><br>
+        <span class="prompt">❯</span> <em>"Compare our 5 sales reps: show pipeline value,<br>
+        &nbsp;&nbsp;number of deals, win rate, and average days since<br>
+        &nbsp;&nbsp;last activity on their open deals.<br>
+        &nbsp;&nbsp;Who's crushing it and who needs help?"</em>
+      </div>
+      <div class="code" style="margin-top:10px">
+        <span class="cmt"># Re-engage cold leads</span><br><br>
+        <span class="prompt">❯</span> <em>"For every company that's gone dark in the last<br>
+        &nbsp;&nbsp;30 days, draft a personalized re-engagement email<br>
+        &nbsp;&nbsp;from their deal owner. Use the company's industry<br>
+        &nbsp;&nbsp;and deal stage to customize the message.<br>
+        &nbsp;&nbsp;Save each email as a separate file."</em><span class="cursor"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 22c: Attio CRM — Dashboard ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">CRM</span><span>attio-dashboard</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Use Case</span>
+      <h2 class="title"><span class="orange">Attio</span> — VP Dashboard</h2>
+      <div class="code">
+        <span class="prompt">❯</span> <em>"Build me a beautiful HTML dashboard showing:</em><br><br>
+        &nbsp;&nbsp;<span class="str">→</span> Pipeline by stage <span class="dim">(bar chart)</span><br>
+        &nbsp;&nbsp;<span class="str">→</span> Rep performance comparison <span class="dim">(table with conditional formatting)</span><br>
+        &nbsp;&nbsp;<span class="str">→</span> At-risk deals <span class="dim">(sorted by urgency)</span><br>
+        &nbsp;&nbsp;<span class="str">→</span> Top neglected leads <span class="dim">(highest score, zero contact)</span><br><br>
+        &nbsp;&nbsp;<em>Make it look professional. Dark theme.<br>
+        &nbsp;&nbsp;Something I could show a VP of Sales."</em><span class="cursor"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 23: Hooks ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">SECURITY</span><span>hooks</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Control</span>
+      <h2 class="title"><span class="orange">Hooks</span></h2>
+      <p class="subtitle">Control points that notify you <strong>before</strong> Claude executes sensitive actions.</p>
+      <div class="code">
+        <span class="cmt"># Example instruction:</span><br><br>
+        <span class="str">"Before you do anything in HubSpot, let me know"</span><br><br>
+        <span class="cmt"># Claude will ask before:</span><br>
+        <span class="dim">├─</span> Modifying contacts<br>
+        <span class="dim">├─</span> Sending emails<br>
+        <span class="dim">└─</span> Changing deal stages
+      </div>
+      <p class="red" style="font-size:12px;margin-top:12px">⚠ Especially important with APIs and real production data</p>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 23b: Hooks — Before & After ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">SECURITY</span><span>hooks-flow</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">How It Works</span>
+      <h2 class="title"><span class="orange">Before</span> &amp; <span class="cyan">After</span> Hooks</h2>
+      <div class="cols">
+        <div class="col-card">
+          <h3 class="orange">Before Hook</h3>
+          <p style="color:var(--gray);font-size:13px;line-height:1.8;font-family:var(--font-display)">
+            Agent wants to create a contact<br>
+            <span class="dim">↓</span><br>
+            <strong style="color:var(--white)">Before hook</strong> → notifies you<br>
+            <span class="dim">↓</span><br>
+            You <span class="green">approve</span> or <span class="red">cancel</span><br>
+            <span class="dim">↓</span><br>
+            Action runs (or not)
+          </p>
+        </div>
+        <div class="col-card">
+          <h3 class="cyan">After Hook</h3>
+          <p style="color:var(--gray);font-size:13px;line-height:1.8;font-family:var(--font-display)">
+            Agent created the contact<br>
+            <span class="dim">↓</span><br>
+            <strong style="color:var(--white)">After hook</strong> → sends you<br>
+            a summary of what it did
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 24: /fast ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">SPEED</span><span>performance</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Fast Mode</span>
+      <h2 class="title"><span class="cmd">/fast</span></h2>
+      <p class="subtitle">Same Opus model, but with <strong>faster output</strong>.</p>
+      <div class="cols">
+        <div class="col-card">
+          <h3 class="green">Pros</h3>
+          <p style="color:var(--gray);font-size:14px;line-height:1.7;font-family:var(--font-display);margin-top:6px">
+            Much faster output<br>
+            Same quality model<br>
+            Ideal for urgent tasks
+          </p>
+        </div>
+        <div class="col-card">
+          <h3 class="red">Cons</h3>
+          <p style="color:var(--gray);font-size:14px;line-height:1.7;font-family:var(--font-display);margin-top:6px">
+            <strong style="color:var(--red)">Much more expensive</strong><br>
+            Not for regular use<br>
+            Only for specific moments
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 26: Agent Teams ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal">
+    <div class="terminal-header"><span class="tab">ADVANCED</span><span>agent-teams</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Multi-Agent</span>
+      <h2 class="title">Agent <span class="orange">Teams</span></h2>
+      <p class="subtitle">Multiple agents working together as a <strong>coordinated team</strong>.</p>
+      <div class="agent-tree">
+        <div class="agent-box agent-main">🎯 ORCHESTRATOR</div>
+        <div class="agent-lines">
+          <div class="agent-line"></div><div class="agent-line"></div><div class="agent-line"></div><div class="agent-line"></div>
+        </div>
+        <div class="agent-row">
+          <div class="agent-box agent-sub"><span class="lbl">🔍</span>Research</div>
+          <div class="agent-box agent-sub" style="border-color:rgba(103,232,249,0.15)"><span class="lbl" style="color:var(--cyan)">💻</span>Coder</div>
+          <div class="agent-box agent-sub" style="border-color:rgba(255,179,71,0.15)"><span class="lbl" style="color:var(--amber)">🧪</span>Tester</div>
+          <div class="agent-box agent-sub" style="border-color:rgba(74,222,128,0.15)"><span class="lbl" style="color:var(--green)">📝</span>Writer</div>
+        </div>
+      </div>
+      <p style="font-family:var(--font-display);color:var(--gray);font-size:14px;text-align:center;margin-top:18px">
+        Each agent with clean context → <strong style="color:var(--white)">maximum quality on every task</strong>
+      </p>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 27: Permissions ═══ -->
+<div class="slide" data-w="2">
+  <div class="terminal terminal-sm">
+    <div class="terminal-header"><span class="tab">⚠ SECURITY</span><span>permissions</span></div>
+    <div class="terminal-body stg">
+      <span class="tag">Important</span>
+      <h2 class="title">Permissions <span class="red">Do Matter</span></h2>
+      <p class="subtitle">Especially when working with <strong>API keys and sensitive data</strong>.</p>
+      <ul class="features">
+        <li><span class="ico" style="color:var(--red);border-color:rgba(248,113,113,0.15);background:rgba(248,113,113,0.06)">🔑</span><span><strong>API Keys</strong> — Never grant elevated permissions with production keys</span></li>
+        <li><span class="ico a">👀</span><span><strong>Review first</strong> — Verify what Claude is going to do with real data</span></li>
+        <li><span class="ico">🛡</span><span><strong>Hooks</strong> — Set them up for critical actions</span></li>
+        <li><span class="ico c">📋</span><span><strong>Audit</strong> — Log Claude's actions in production</span></li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 29: END ═══ -->
+<div class="slide" data-w="0">
+  <div class="hero stg">
+    <div class="hero-pre" style="color:var(--orange)">~ / E N D</div>
+    <h1 style="font-size:clamp(42px,7vw,80px)"><span class="o">Thank you.</span></h1>
+    <div class="hero-line"></div>
+    <p style="font-family:var(--font-display);font-size:17px;color:var(--gray);max-width:500px;line-height:1.6;text-align:center">
+      Now you have the tools to build anything.
+    </p>
+    <div style="margin-top:32px;font-size:13px;color:var(--gray-dim)">
+      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--orange);margin-right:8px;animation:blink 1.5s ease-in-out infinite"></span>
+      Ana Sofia Grass — Claude Code
+    </div>
+  </div>
+</div>
+
+</div><!-- #deck -->
+
+<script>
+// ── Grid BG parallax orb ──
+const orb=document.getElementById('orb');
+document.addEventListener('mousemove',e=>{
+  const x=e.clientX-250,y=e.clientY-250;
+  orb.style.top=y+'px';orb.style.left=x+'px';
+});
+
+// ── Slide Engine ──
+(function(){
+  const slides=[...document.querySelectorAll('.slide')];
+  const bar=document.getElementById('progress-bar');
+  const curEl=document.querySelector('.counter .cur');
+  const totEl=document.querySelector('.counter .total');
+  const pill=document.getElementById('week-pill');
+  let cur=0,busy=false;
+
+  totEl.textContent=slides.length;
+
+  function go(i){
+    if(i<0||i>=slides.length||i===cur||busy)return;
+    busy=true;
+    slides[cur].classList.remove('active');
+    slides[i].classList.add('active');
+    cur=i;
+    curEl.textContent=cur+1;
+    bar.style.width=((cur/(slides.length-1))*100)+'%';
+
+    const w=slides[cur].dataset.w;
+    if(w==='1'){pill.textContent='WEEK 1';pill.className='show'}
+    else if(w==='2'){pill.textContent='WEEK 2';pill.className='show'}
+    else{pill.className=''}
+
+    setTimeout(()=>{busy=false},600);
+  }
+
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(cur+1)}
+    if(e.key==='ArrowLeft'){e.preventDefault();go(cur-1)}
+    if(e.key==='Home'){e.preventDefault();go(0)}
+    if(e.key==='End'){e.preventDefault();go(slides.length-1)}
+  });
+
+  let tx=0;
+  document.addEventListener('touchstart',e=>{tx=e.changedTouches[0].screenX});
+  document.addEventListener('touchend',e=>{
+    const d=e.changedTouches[0].screenX-tx;
+    if(Math.abs(d)>50){d<0?go(cur+1):go(cur-1)}
+  });
+
+  document.addEventListener('click',e=>{
+    if(e.target.closest('#topbar,#nav'))return;
+    const x=e.clientX/innerWidth;
+    if(x>0.65)go(cur+1);else if(x<0.35)go(cur-1);
+  });
+})();
+</script>
+</body>
+</html>
